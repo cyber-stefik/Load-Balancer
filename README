@@ -1,0 +1,68 @@
+# Copyright 2021 Stefanita Ionita
+
+*******************************************************************************
+
+Am ales sa folosesc o lista circulara dublu inlantuita ca load_balancer, iar
+serverele le-am considerat hashtable-uri.
+
+Pentru sursa load_balancer.c:
+
+- init_load_balancer aloca memorie unei structuri de tip load_balancer, care,
+pentru mine, este o lista circulara dublu inlantuita. Creez si lista in aceeasi
+functie si returneaza load_balancer;
+
+- loader_store verifica, in primul rand, daca k_hash (hash-ul key-ului) este mai
+mare decat hash-ul ultimului server din hashring pentru a putea stoca obiectul
+pe capul listei, asta fiind cerinta in acest caz, server_id % 1000000
+reprezentand id-ul serverului original. In cazul in care k_hash nu e mai mare
+decat hash-ul ultimului server, parcurg hashring-ul pana gasesc primul server
+cu hash-ul mai mare decat k_hash si il stochez corespunzator;
+
+- In loader_retrieve parcurg cu un for hashring-ul pana gasesc primul server cu
+hash mai mare decat k_hash si apelez functia server_retrieve pentru a obtine
+obiectul cerut. In cazul in care ajung la finalul for-ului, inseamna ca k_hash
+este mai mare decat hash-ul ultimului server, deci obiectul e stocat pe head-ul
+hashring-ului;
+
+- copy_server calculeaza id-ul si hash-ul unei replici, fiind apoi folosita
+in loader_add server.
+
+- add_on_hashring face exact ce zice si numele, adauga un server pe hashring.
+In cazul in care hashring-ul e gol, il adauga pe pozitia 0, altfel parcurg lista
+si il adaug pe index-ul corespunzator, functia e folosita in loader_add_server;
+
+- In remap caut initial serverul cu id-ul corespunzator, apoi ii parcurg
+elementele serverului urmator, caut in fiecare bucket si folosesc functia
+loader_store pentru a adauga elementele pe serverul cu id-ul server_id in cazul
+in care hash-ul obiectului e mai mic decat hash-ul serverului cu id-ul server_id
+Am tratat si cazul in care serverul este head-ul listei.
+
+- loader_add_server aloca memorie replicilor, le adauga pe hashring, apeland
+functiile de add_on_hashring si remap. La final eliberez memoria alocata;
+
+- In delete_server folosesc un for de la 0 la 3 pentru ca stiu ca sunt 3 replici
+pe hashring si caut cu alt for, cu care parcurg hashring-ul, replicile pentru a
+le elibera memoria, apeland functii din CircularDoublyLinkedList.c;
+
+- In loader_remove_server copiez toate elementele intr-un array, eliberez
+memoria serverului care trebuie sters folosind delete_server si folosesc
+loader_store pentru a stoca elementele din array, eliberandu-le si lor memoria.
+
+- free_load_balancer elibereaza toata memoria alocata, conditia fiind prezenta
+pentru a folosi o singura data free_server_memory. Apelez functia dll_free
+pentru a elibera memoria alocata hashring-ului, apoi eliberez toate structura
+load_balancer folosita.
+
+*******************************************************************************
+
+Pentru sursa server.c:
+
+- init_server_memory aloca memorie structurii de server si hashtable-ului, dupa
+care returneaza serverul;
+
+- server_store apeleaza functia ht_put pentru a stoca elementul pe server;
+
+- server_retrieve returneaza functia ht_get pentru a obtine obiectul cautat;
+
+- free_server_memory apeleaza functia ht_free pentru a elibera memoria unui
+server.
